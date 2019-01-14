@@ -4,13 +4,12 @@
 #include <cuda.h>
 
 
-//Device functions can only be called from other device or global functions. __device__ functions cannot be called from host code.
+long n = 21;
 
-//Global functions are also called "kernels". It's the functions that you may call from the host side using CUDA kernel call semantics (<<<...>>>).
-__global__ void testKernel(long *in, long *out, long size){
+
+__global__ void testKernel(long *in, long *out, long size, long n){
 
 	bool oddeven = true;
-	//__shared__ for shared memory
 	__shared__ bool swappedodd;
 	__shared__ bool swappedeven;
 	
@@ -18,12 +17,12 @@ __global__ void testKernel(long *in, long *out, long size){
 
 	while(1){
 	
+      if(n % 2 == 0) {
+          
 		if(oddeven == true){
-			
-
 			__syncthreads();
 
-			swappedeven=false;
+			swappedeven = false;
 
 			__syncthreads();
 
@@ -33,17 +32,17 @@ __global__ void testKernel(long *in, long *out, long size){
 				int idx = threadIdx.x;
 				
 				//0, 1, 2 threads will go through
-				if( idx < (size/2) ){
+				if( idx < (size / 2) ){
 					//COMPARISONS:
 					// 0 <--> 1
 					// 2 <--> 3
 					// 4 <--> 5
-					if ( in[2*idx] > in[2*idx+1] ){
+					if ( in[2 * idx] > in[2 * idx + 1] ){
 						//BUBBLE SORT LOGIC
-						temp= in[2*idx];
-						in[2*idx]=in[2*idx+1];
-						in[2*idx+1]=temp;
-						swappedeven=true;
+						temp = in[2 * idx];
+						in[2 * idx] = in[2 * idx + 1];
+						in[2 * idx + 1] = temp;
+						swappedeven = true;
 					
 					}
 				}
@@ -59,37 +58,81 @@ __global__ void testKernel(long *in, long *out, long size){
 			__syncthreads();
 
 			if (threadIdx.y == 0) {
-
 				int idx = threadIdx.x;
 				//0, 1 will go through
-				if( idx < (size/2)-1 ){
+				if( idx < (size / 2) - 1 ){
 					//COMPARISONS:
 					// 1 <--> 2
 					// 3 <--> 4
-					if ( in[2*idx+1] > in[2*idx+2] ){
-
-						temp=in[2*idx+1];
-						in[2*idx+1]=in[2*idx+2];
-						in[2*idx+2]=temp;
-						swappedodd=true;
-
+					if ( in[2 * idx + 1] > in[2 * idx + 2] ){
+						temp = in[2 * idx + 1];
+						in[2 * idx + 1] = in[2 * idx + 2];
+						in[2 * idx + 2] = temp;
+						swappedodd = true;
 					}
-
 				}
-
-
 			}
-
 			__syncthreads();
-
 		}
+  } else {
+          
+          if(oddeven == true)
+          {
+			       __syncthreads();
+
+			       swappedeven = false;
+
+			       __syncthreads();
+
+			   //first column only which would have the array
+			     if (threadIdx.y == 0) 
+            {
+             int idx = threadIdx.x;
+				     //0, 1, 2 threads will go through
+				     if( idx < (size / 2) )
+             {
+					     if(in[2 * idx] > in[2 * idx + 1])
+                 {
+						        temp = in[2 * idx];
+						        in[2 * idx] = in[2 * idx + 1];
+						        in[2 * idx + 1] = temp;
+						        swappedeven = true;
+					       }
+				      }
+			       }
+			      __syncthreads();
+		      }
+		  else
+          {
+			     __syncthreads();
+			     swappedodd=false;
+			     __syncthreads();
+
+			     if (threadIdx.y == 0) 
+           {
+				      int idx = threadIdx.x;
+				      //0, 1 will go through
+				      if(idx < (size / 2))
+               {
+					       if(in[2 * idx + 1] > in[2 * idx + 2])
+                  {
+					 	          temp = in[2 * idx + 1];
+						          in[2 * idx + 1] = in[2 * idx + 2];
+						          in[2 * idx + 2] = temp;
+						          swappedodd = true;
+					         }
+				      }
+			     }
+			     __syncthreads();
+		      }
+      }
 	
 	//if there are no swaps in odd phase as well as even phase then break (which means all sorting is done)
 	// !(false) => true
 	if( !( swappedodd || swappedeven ) )
 		break;
 
-	oddeven =! oddeven;	//switch phase of sorting
+	oddeven = !oddeven;	//switch phase of sorting
 
 	}
 
@@ -111,7 +154,7 @@ int main(void)
 	long *d_a, *d_sorted;
 	//int n = 1* 1000 * 10;		//make sure to keep this even
 	
-    long n = 1000;
+    
     long size = sizeof(long) *n;
   cudaEvent_t start, stop;
 
@@ -146,7 +189,7 @@ int main(void)
 	cudaMemcpy(d_a, a, size, cudaMemcpyHostToDevice);
 	
 	//<<< >>> CUDA semantic
-	testKernel<<<3 ,n>>>(d_a, d_sorted, n);
+	testKernel<<<3 ,n>>>(d_a, d_sorted, n, n);
 
 	//Device to Host array for final display (I/O)
 	cudaMemcpy(a_sorted, d_sorted, size, cudaMemcpyDeviceToHost);
